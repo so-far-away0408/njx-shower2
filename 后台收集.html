@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老师手机端 - 签到数据查看</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI'; }
+        body { background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; padding: 15px; }
+        .container { max-width: 100%; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
+        .header { background: #667eea; color: white; padding: 25px 20px; text-align: center; }
+        .header h1 { font-size: 22px; margin-bottom: 8px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 15px; background: #f8f9fa; }
+        .stat-card { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+        .stat-number { font-size: 24px; font-weight: bold; color: #667eea; margin-bottom: 5px; }
+        .stat-label { color: #666; font-size: 12px; }
+        .controls { padding: 15px; background: white; border-bottom: 1px solid #eee; }
+        .btn-group { display: flex; gap: 10px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-secondary { background: #f8f9fa; color: #333; border: 1px solid #ddd; }
+        .btn-success { background: #28a745; color: white; }
+        .records-container { padding: 15px; max-height: 60vh; overflow-y: auto; }
+        .record-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 12px; border-left: 4px solid #28a745; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .record-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .student-info { font-weight: bold; color: #333; font-size: 16px; }
+        .timestamp { color: #888; font-size: 12px; }
+        .record-meta { display: flex; justify-content: space-between; font-size: 12px; color: #666; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #666; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
+        .filter-tabs { display: flex; background: #f8f9fa; border-radius: 10px; padding: 5px; margin-bottom: 15px; }
+        .filter-tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.3s; }
+        .filter-tab.active { background: #667eea; color: white; }
+        .search-box { margin-bottom: 15px; }
+        .search-box input { width: 100%; padding: 12px; border: 2px solid #e1e5ee; border-radius: 10px; font-size: 14px; }
+        .last-update { text-align: center; padding: 10px; color: #666; font-size: 12px; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 老师手机端</h1>
+            <p>实时查看学生签到数据</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalCount">0</div>
+                <div class="stat-label">总签到</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="todayCount">0</div>
+                <div class="stat-label">今日签到</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="lastHourCount">0</div>
+                <div class="stat-label">最近1小时</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="successRate">100%</div>
+                <div class="stat-label">成功率</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="btn-group">
+                <button class="btn-primary" onclick="refreshData()">🔄 刷新</button>
+                <button class="btn-secondary" onclick="exportData()">📤 导出</button>
+                <button class="btn-success" onclick="showQRCode()">📷 签到码</button>
+            </div>
+        </div>
+        
+        <div class="filter-tabs">
+            <div class="filter-tab active" onclick="setFilter('all')">全部</div>
+            <div class="filter-tab" onclick="setFilter('today')">今日</div>
+            <div class="filter-tab" onclick="setFilter('recent')">最近1小时</div>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 搜索学号或姓名..." onkeyup="filterRecords()">
+        </div>
+        
+        <div class="records-container" id="recordsContainer">
+            <!-- 签到记录将在这里显示 -->
+        </div>
+        
+        <div class="last-update" id="lastUpdate">
+            最后更新: 刚刚
+        </div>
+    </div>
+
+    <script>
+        let currentFilter = 'all';
+        let allRecords = [];
+        
+        function init() {
+            loadRecords();
+            updateStats();
+            displayRecords();
+            startAutoRefresh();
+        }
+        
+        function loadRecords() {
+            allRecords = JSON.parse(localStorage.getItem('signinRecords')) || [];
+            allRecords.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        }
+        
+        function updateStats() {
+            const total = allRecords.length;
+            const today = allRecords.filter(record => 
+                new Date(record.timestamp).toDateString() === new Date().toDateString()
+            ).length;
+            
+            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+            const lastHour = allRecords.filter(record => 
+                new Date(record.timestamp) > oneHourAgo
+            ).length;
+            
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('todayCount').textContent = today;
+            document.getElementById('lastHourCount').textContent = lastHour;
+            document.getElementById('successRate').textContent = '100%';
+            
+            document.getElementById('lastUpdate').textContent = 
+                `最后更新: ${new Date().toLocaleTimeString()}`;
+        }
+        
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            displayRecords();
+        }
+        
+        function filterRecords() {
+            displayRecords();
+        }
+        
+        function displayRecords() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const container = document.getElementById('recordsContainer');
+            
+            let filteredRecords = allRecords.filter(record => {
+                const recordTime = new Date(record.timestamp);
+                const now = new Date();
+                
+                if (currentFilter === 'today') {
+                    if (recordTime.toDateString() !== now.toDateString()) return false;
+                } else if (currentFilter === 'recent') {
+                    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+                    if (recordTime < oneHourAgo) return false;
+                }
+                
+                if (searchTerm) {
+                    const searchIn = (record.studentId + record.name).toLowerCase();
+                    if (!searchIn.includes(searchTerm)) return false;
+                }
+                
+                return true;
+            });
+            
+            if (filteredRecords.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📝</div>
+                        <div>暂无签到记录</div>
+                        <div style="font-size: 12px; margin-top: 8px; opacity: 0.7;">
+                            ${searchTerm ? '没有找到匹配的记录' : '学生签到后数据将显示在这里'}
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filteredRecords.map(record => {
+                const recordTime = new Date(record.timestamp);
+                const timeText = recordTime.toLocaleString();
+                const timeAgo = getTimeAgo(recordTime);
+                
+                return `
+                    <div class="record-item">
+                        <div class="record-header">
+                            <div class="student-info">${record.name} (${record.studentId})</div>
+                            <div class="timestamp">${timeAgo}</div>
+                        </div>
+                        <div class="record-meta">
+                            <span>✅ 签到成功</span>
+                            <span>签到ID: ${record.signId || 'N/A'}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #999; margin-top: 5px;">${timeText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            
+            if (diffMins < 1) return '刚刚';
+            if (diffMins < 60) return `${diffMins}分钟前`;
+            if (diffHours < 24) return `${diffHours}小时前`;
+            return `${Math.floor(diffHours / 24)}天前`;
+        }
+        
+        function refreshData() {
+            loadRecords();
+            updateStats();
+            displayRecords();
+            
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✅ 已刷新';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+            }, 1000);
+        }
+        
+        function exportData() {
+            if (allRecords.length === 0) {
+                alert('暂无签到数据可导出');
+                return;
+            }
+            
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + "学号,姓名,签到时间,签到ID\n"
+                + allRecords.map(record => 
+                    `${record.studentId},${record.name},${new Date(record.timestamp).toLocaleString()},${record.signId || 'N/A'}`
+                ).join("\n");
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `签到记录_${new Date().toLocaleDateString()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function showQRCode() {
+            const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+            const qrUrl = baseUrl + 'qr-generator.html';
+            window.open(qrUrl, '_blank');
+        }
+        
+        function startAutoRefresh() {
+            setInterval(() => {
+                loadRecords();
+                updateStats();
+                if (currentFilter === 'recent') {
+                    displayRecords();
+                }
+            }, 30000);
+        }
+        
+        window.onload = init;
+    </script>
+</body>
+</html>

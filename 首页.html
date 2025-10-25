@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>签到系统 - 首页</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI'; }
+        body { background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); max-width: 500px; width: 100%; text-align: center; }
+        h1 { color: #333; margin-bottom: 20px; }
+        .nav-buttons { display: flex; flex-direction: column; gap: 15px; margin: 30px 0; }
+        .nav-btn { padding: 15px; background: #667eea; color: white; text-decoration: none; border-radius: 10px; font-size: 16px; font-weight: 600; transition: background 0.3s; }
+        .nav-btn:hover { background: #5a6fd8; }
+        .info { background: #f0f8ff; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 课堂签到系统</h1>
+        <p>选择您的角色进入相应页面</p>
+        
+        <div class="nav-buttons">
+            <a href="qr-generator.html" class="nav-btn">👨‍🏫 老师 - 生成签到二维码</a>
+            <a href="student-sign.html" class="nav-btn">👨‍🎓 学生 - 扫码签到</a>
+            <a href="teacher-dashboard.html" class="nav-btn">📊 老师 - 查看签到数据</a>
+            <a href="instruction-set.html" class="nav-btn">⚙️ 老师 - 设置签到指令</a>
+        </div>
+        
+        <div class="info">
+            <strong>系统说明：</strong><br>
+            1. 老师先设置签到指令<br>
+            2. 生成二维码让学生扫描<br>
+            3. 学生输入指令完成签到<br>
+            4. 老师查看签到数据
+        </div>
+    </div>
+</body>
+</html>
